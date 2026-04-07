@@ -1,0 +1,296 @@
+# Amazon NFT — European Fulfillment Network Analysis
+
+## Full Data Dictionary
+
+---
+
+## 1. Dataset Overview
+
+This dataset represents a **multi-echelon European fulfillment network**, capturing the full supply chain from **suppliers to customers** over a **4-month period (Sep–Dec 2024)**.
+
+| Table                    | Rows   | Time Period      | Purpose                 |
+| ------------------------ | ------ | ---------------- | ----------------------- |
+| suppliers                | 10     | Static           | Vendor master data      |
+| nodes                    | 24     | Static           | Network location master |
+| skus                     | 250    | Static           | Product catalogue       |
+| purchase_orders          | 125    | Sep–Dec 2024     | Supplier replenishment  |
+| inventory                | 1,312  | Current snapshot | Stock levels            |
+| transfers                | 2,860  | Sep–Dec 2024     | Shipment movements      |
+| replenishment_comparison | 4,849  | Sep–Dec 2024     | Push vs Pull simulation |
+| orders                   | 16,615 | Nov–Dec 2024     | Customer demand         |
+| sla_performance          | 1,280  | Sep–Dec 2024     | Transit performance     |
+
+**Total:** 27,325 rows across 9 tables
+
+---
+
+## 2. Table Definitions
+
+### 2.1 suppliers
+
+**Purpose:** Vendor master data — origin of supply chain
+
+| Column            | Type    | Description                 |
+| ----------------- | ------- | --------------------------- |
+| supplier_id       | VARCHAR | Unique supplier ID          |
+| supplier_name     | VARCHAR | Supplier name               |
+| location          | VARCHAR | Supplier location           |
+| lead_time_days    | INT     | PO to delivery time         |
+| reliability_score | DECIMAL | On-time delivery rate (0–1) |
+
+**Relationships:**
+
+* Linked to **nodes** via `primary_supplier_id`
+* Linked to **purchase_orders** via `supplier_id`
+
+---
+
+### 2.2 nodes
+
+**Purpose:** Defines all physical locations in the network
+
+| Column              | Type    | Description         |
+| ------------------- | ------- | ------------------- |
+| node_id             | VARCHAR | Unique node ID      |
+| node_type           | VARCHAR | Node classification |
+| location            | VARCHAR | Geographic location |
+| capacity_units      | INT     | Storage capacity    |
+| primary_supplier_id | VARCHAR | Default supplier    |
+
+**Node Types**
+
+| Type  | Role                      | Replenishment |
+| ----- | ------------------------- | ------------- |
+| 1DC   | Primary DC (bulk storage) | Daily         |
+| RDC   | Regional buffer           | Weekly        |
+| IXD   | Cross-dock (no storage)   | Continuous    |
+| FC    | Fulfillment center        | On demand     |
+| NEXUS | Last-mile hub             | Daily         |
+
+**Relationships:** Central table linked to all operational tables
+
+---
+
+### 2.3 skus
+
+**Purpose:** Product catalogue with demand characteristics
+
+| Column         | Type    | Description         |
+| -------------- | ------- | ------------------- |
+| sku_id         | VARCHAR | Product ID          |
+| category       | VARCHAR | Product category    |
+| velocity       | VARCHAR | Demand speed        |
+| unit_cost_eur  | DECIMAL | Unit cost           |
+| weight_kg      | DECIMAL | Product weight      |
+| demand_profile | VARCHAR | Seasonality pattern |
+| supplier_id    | VARCHAR | Supplier            |
+
+**Velocity Definitions**
+
+| Velocity | Meaning        | Priority |
+| -------- | -------------- | -------- |
+| fast     | Daily demand   | High     |
+| medium   | Weekly demand  | Medium   |
+| slow     | Monthly demand | Low      |
+
+**Demand Profiles:** flat, winter_peak, summer_peak, event_driven
+
+---
+
+### 2.4 purchase_orders
+
+**Purpose:** Upstream replenishment into DCs
+
+| Column           | Type    | Description      |
+| ---------------- | ------- | ---------------- |
+| po_id            | INT     | PO ID            |
+| supplier_id      | VARCHAR | Supplier         |
+| destination_dc   | VARCHAR | Receiving DC     |
+| sku_id           | VARCHAR | Product          |
+| quantity_ordered | INT     | Units            |
+| unit_cost_eur    | DECIMAL | Unit cost        |
+| total_cost_eur   | DECIMAL | Total cost       |
+| order_date       | DATE    | Order date       |
+| eta_date         | DATE    | Expected arrival |
+| status           | VARCHAR | PO status        |
+
+**Status:** delivered, in_transit, pending
+
+---
+
+### 2.5 inventory
+
+**Purpose:** Current stock snapshot across nodes
+
+| Column                 | Type    | Description           |
+| ---------------------- | ------- | --------------------- |
+| inventory_id           | INT     | Record ID             |
+| node_id                | VARCHAR | Location              |
+| sku_id                 | VARCHAR | Product               |
+| units_on_hand          | INT     | Stock level           |
+| reorder_point          | INT     | Replenishment trigger |
+| max_capacity           | INT     | Storage limit         |
+| daily_storage_cost_eur | DECIMAL | Cost per unit/day     |
+
+**Important:** Snapshot only (not time-series)
+
+**Derived Metrics**
+
+* Capacity Utilization = units_on_hand / max_capacity
+* Stock Gap = units_on_hand − reorder_point
+* Holding Cost = units_on_hand × storage cost
+
+---
+
+### 2.6 transfers
+
+**Purpose:** Tracks all inventory movements (core flow table)
+
+| Column            | Type    | Description         |
+| ----------------- | ------- | ------------------- |
+| transfer_id       | INT     | Transfer ID         |
+| from_node         | VARCHAR | Origin              |
+| to_node           | VARCHAR | Destination         |
+| sku_id            | VARCHAR | Product             |
+| units             | INT     | Quantity            |
+| transit_hrs       | DECIMAL | Transit time        |
+| handling_cost_eur | DECIMAL | Handling cost       |
+| transit_cost_eur  | DECIMAL | Transport cost/unit |
+| storage_cost_eur  | DECIMAL | Interim storage     |
+| total_cost_eur    | DECIMAL | Total cost          |
+| transfer_mode     | VARCHAR | Mode (road, etc.)   |
+| status            | VARCHAR | Transfer status     |
+| transfer_date     | DATE    | Date                |
+
+**Status:** completed, in_transit, delayed
+
+**Standard Routes**
+
+* DC/RDC → IXD: < 10 hrs
+* IXD → FC: < 5 hrs
+
+---
+
+### 2.7 replenishment_comparison
+
+**Purpose:** Simulates push vs pull strategies
+
+| Column                       | Description    |
+| ---------------------------- | -------------- |
+| rep_id                       | Event ID       |
+| fc_node / ixd_node / dc_node | Network path   |
+| sku_id                       | Product        |
+| event_date                   | Date           |
+| push_qty_ordered             | Push quantity  |
+| push_trigger                 | Forecast-based |
+| push_idle_days               | Idle inventory |
+| push_stockout                | Stockout flag  |
+| push_total_cost_eur          | Total cost     |
+| pull_qty_ordered             | Pull quantity  |
+| pull_trigger                 | Reorder-based  |
+| pull_idle_days               | Idle inventory |
+| pull_stockout                | Stockout flag  |
+| pull_total_cost_eur          | Total cost     |
+| transit_hrs                  | Transit time   |
+| cost_per_unit_eur            | Unit cost      |
+
+**Important:**
+
+* Each row contains BOTH push and pull scenarios
+* Fully simulated (not real decisions)
+
+---
+
+### 2.8 orders
+
+**Purpose:** Customer demand and fulfillment outcomes
+
+| Column                 | Type    | Description        |
+| ---------------------- | ------- | ------------------ |
+| order_id               | INT     | Order ID           |
+| fc_node                | VARCHAR | Fulfillment center |
+| sku_id                 | VARCHAR | Product            |
+| units_demanded         | INT     | Demand             |
+| delivery_sla_hrs       | INT     | SLA                |
+| fulfillment_status     | VARCHAR | Outcome            |
+| actual_dispatch_hrs    | DECIMAL | Dispatch time      |
+| order_date             | DATE    | Order date         |
+| seasonality_multiplier | DECIMAL | Demand factor      |
+| is_promotional_period  | BOOLEAN | Promo flag         |
+
+**Status:** fulfilled, stockout
+
+**SLA by Velocity**
+
+* Fast: 24h
+* Medium: 48h
+* Slow: 72h
+
+**Key Events**
+
+* Black Friday (3.5x demand)
+* Cyber Monday
+* Christmas / Boxing Day
+
+---
+
+### 2.9 sla_performance
+
+**Purpose:** Measures transport reliability
+
+| Column              | Type    | Description    |
+| ------------------- | ------- | -------------- |
+| sla_id              | INT     | Record ID      |
+| from_node           | VARCHAR | Origin         |
+| to_node             | VARCHAR | Destination    |
+| measurement_date    | DATE    | Date           |
+| planned_transit_hrs | DECIMAL | SLA target     |
+| actual_transit_hrs  | DECIMAL | Actual time    |
+| sla_breached        | BOOLEAN | Breach flag    |
+| delay_hrs           | DECIMAL | Delay duration |
+| delay_reason        | VARCHAR | Cause          |
+
+**SLA Targets**
+
+* DC/RDC → IXD: 10 hrs
+* IXD → FC: 5 hrs
+
+**Delay Reasons**
+
+* customs_hold
+* carrier_capacity
+* weather
+* port_congestion
+* driver_shortage
+* other
+
+---
+
+## 3. Key Relationships
+
+* **suppliers → purchase_orders → nodes → transfers → orders**
+* **nodes** is the central hub connecting all tables
+* **skus** links product flow across all operational tables
+
+---
+
+## 4. Key Notes
+
+* Inventory is **static (snapshot only)**
+* Replenishment comparison is **simulated data**
+* Transfers represent **actual physical flow (source of truth)**
+* Orders include **seasonality and promotional effects**
+
+---
+
+## 5. Analytical Applications
+
+* Supply chain optimization
+* Inventory planning and stockout analysis
+* Push vs pull strategy evaluation
+* Cost-to-serve modeling
+* SLA and delay root cause analysis
+
+---
+
+This data dictionary provides a **complete structural and business understanding** of the dataset, enabling advanced analytics across **logistics, operations, and supply chain strategy**.
