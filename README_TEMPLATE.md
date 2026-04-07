@@ -1,14 +1,13 @@
 # [Project Title]
-> *One sentence. What did you analyze, build, or solve - and why does it matter?*
+> *How should inventory move through this network to guarantee customer order fulfilment within 24 hours at the lowest possible cost?*
 
 ---
 
 ## ⚙️ Project Type Flags
-> *Check what applies. This helps reviewers and collaborators understand the nature of the work at a glance. Delete this block before publishing.*
 
-- [ ] Exploratory Data Analysis (EDA)
-- [ ] SQL Analysis / Querying
-- [ ] Dashboard / Data Visualization
+- [Y] Exploratory Data Analysis (EDA)
+- [Y] SQL Analysis / Querying
+- [Y] Dashboard / Data Visualization
 - [ ] Data Pipeline / ETL
 - [ ] Predictive Modelling / Machine Learning
 - [ ] Data Cleaning / Wrangling
