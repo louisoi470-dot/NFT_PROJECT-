@@ -1,0 +1,88 @@
+Amazon NFT — European Fulfillment Network Analysis
+Overview
+
+This dataset models a multi-echelon European fulfillment network across a 4-month period (Sep–Dec 2024), combining operational, inventory, and customer demand data to analyze network efficiency and compare push vs. pull replenishment strategies.
+
+Total Tables: 9
+Total Records: 27,325
+Time Coverage: 4 months
+Scope: End-to-end supply chain (supplier → DC → IXD → FC → customer)
+Data Model Structure
+
+Upstream Supply
+
+suppliers (10): Vendor master data (lead times, reliability)
+purchase_orders (125): Replenishment orders into DCs
+
+Network Infrastructure
+
+nodes (24): All physical locations (DC, RDC, IXD, FC, NEXUS)
+
+Product Layer
+
+skus (250): Product catalogue with cost, weight, demand profile, velocity
+
+Inventory & Flow
+
+inventory (1,312): Current stock snapshot across nodes
+transfers (2,860): Movements between nodes (core flow table)
+
+Decision & Simulation Layer
+
+replenishment_comparison (4,849): Push vs pull scenario modeling
+
+Customer Demand
+
+orders (16,615): Customer orders and fulfillment outcomes
+
+Performance Monitoring
+
+sla_performance (1,280): Transit time vs SLA tracking
+Network Design
+
+Node Types & Roles
+
+1DC: Primary distribution center (bulk storage, daily replenishment)
+RDC: Regional buffer (slow-moving inventory, weekly replenishment)
+IXD: Cross-dock (sorting, no storage, continuous flow)
+FC: Fulfillment center (pick, pack, ship)
+NEXUS: Last-mile dispatch hub
+Key Business Logic
+
+1. Inventory Metrics
+
+Capacity Utilization = units_on_hand / max_capacity
+Stock Gap = units_on_hand - reorder_point
+Holding Cost = units_on_hand × daily_storage_cost
+
+2. Product Segmentation
+
+Fast: Daily demand → highest priority
+Medium: Weekly demand
+Slow: Monthly demand
+
+3. Demand Profiles
+
+Flat | Winter Peak | Summer Peak | Event-Driven
+
+4. SLA Targets
+
+DC/RDC → IXD: ≤ 10 hrs
+IXD → FC: ≤ 5 hrs
+Core Analytical Use Cases
+Network Flow Optimization:
+Analyze transfer routes, costs, and bottlenecks
+Inventory Efficiency:
+Identify overstock, stockouts, and capacity issues
+Push vs Pull Strategy Evaluation:
+Compare cost, idle time, and stockout risk
+Customer Fulfillment Performance:
+Measure service levels and stockout impact
+SLA & Delay Root Cause Analysis:
+Track delays (e.g., customs, weather, capacity constraints)
+
+Critical Notes
+Inventory is a snapshot (not time-series)
+Replenishment table is simulated (not historical decisions)
+Orders include seasonality effects (e.g., Black Friday spikes)
+Transfers are the primary source of truth for actual network movement
